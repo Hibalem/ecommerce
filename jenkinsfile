@@ -7,7 +7,9 @@ pipeline {
   }
   stages {
     stage('Checkout') {
-      steps { git 'https://github.com/Hibalem/ecommerce.git' }
+      steps {
+        git 'https://github.com/Hibalem/ecommerce.git'
+      }
     }
     stage('Build Docker Images') {
       steps {
@@ -22,9 +24,20 @@ pipeline {
       steps {
         script {
           withAWS(credentials: 'aws-credentials') {
-            sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REPO}"
-            sh "docker tag user-service:latest ${ECR_REPO}/user-service:latest && docker push ${ECR_REPO}/user-service:latest"
-            // Repeat for others
+            // Fixed login command to avoid TTY issues
+            sh "docker login --username AWS --password \$(aws ecr get-login-password --region \${AWS_REGION}) \${ECR_REPO}"
+            
+            // Tag and push user-service
+            sh "docker tag user-service:latest \${ECR_REPO}/user-service:latest"
+            sh "docker push \${ECR_REPO}/user-service:latest"
+            
+            // Tag and push product-service
+            sh "docker tag product-service:latest \${ECR_REPO}/product-service:latest"
+            sh "docker push \${ECR_REPO}/product-service:latest"
+            
+            // Tag and push order-service
+            sh "docker tag order-service:latest \${ECR_REPO}/order-service:latest"
+            sh "docker push \${ECR_REPO}/order-service:latest"
           }
         }
       }
@@ -33,11 +46,16 @@ pipeline {
       steps {
         script {
           withAWS(credentials: 'aws-credentials') {
-            sh "aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME}"
+            sh "aws eks update-kubeconfig --region \${AWS_REGION} --name \${CLUSTER_NAME}"
             sh 'kubectl apply -f k8s/app-deployment.yml'
           }
         }
       }
+    }
+  }
+  post {
+    failure {
+      echo 'Pipeline failed. Check logs for details.'
     }
   }
 }
