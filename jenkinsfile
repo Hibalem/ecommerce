@@ -1,10 +1,5 @@
 pipeline {
-  agent {
-  docker {
-    image 'my-jenkins:latest'  // Or a custom image with AWS CLI and Docker
-    args '-v /var/run/docker.sock:/var/run/docker.sock'  // Mount Docker socket if needed
-  }
-}
+  agent any
   environment {
     AWS_REGION = "us-east-1"
     CLUSTER_NAME = "my-cluster"
