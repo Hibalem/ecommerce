@@ -2,7 +2,7 @@ pipeline {
   agent any
   environment {
     AWS_REGION = "us-east-1"
-    CLUSTER_NAME = "my-cluster"
+    CLUSTER_NAME = "my-cluster"  // Matches Terraform EKS cluster name
     ECR_REPO = "891377219096.dkr.ecr.us-east-1.amazonaws.com"
   }
   stages {
@@ -14,6 +14,7 @@ pipeline {
     stage('Build Docker Images') {
       steps {
         script {
+          // Build images for the microservices (as per project guide's app deployment)
           sh 'docker build -t user-service ./services/user-service'
           sh 'docker build -t product-service ./services/product-service'
           sh 'docker build -t order-service ./services/order-service'
@@ -24,23 +25,19 @@ pipeline {
       steps {
         script {
           withAWS(credentials: 'aws-credentials') {
-            // Get the password token and login
+            // Check if AWS CLI is available (add this for debugging)
+            sh 'which aws || echo "AWS CLI not found"'
+            
+            // Fixed login: Use multi-line sh to capture password securely
             sh """
               PASSWORD=\$(aws ecr get-login-password --region \${AWS_REGION})
               docker login --username AWS --password \$PASSWORD \${ECR_REPO}
             """
             
-            // Tag and push user-service
-            sh "docker tag user-service:latest \${ECR_REPO}/user-service:latest"
-            sh "docker push \${ECR_REPO}/user-service:latest"
-            
-            // Tag and push product-service
-            sh "docker tag product-service:latest \${ECR_REPO}/product-service:latest"
-            sh "docker push \${ECR_REPO}/product-service:latest"
-            
-            // Tag and push order-service
-            sh "docker tag order-service:latest \${ECR_REPO}/order-service:latest"
-            sh "docker push \${ECR_REPO}/order-service:latest"
+            // Tag and push each service (expands on project guide's Docker push)
+            sh "docker tag user-service:latest \${ECR_REPO}/user-service:latest && docker push \${ECR_REPO}/user-service:latest"
+            sh "docker tag product-service:latest \${ECR_REPO}/product-service:latest && docker push \${ECR_REPO}/product-service:latest"
+            sh "docker tag order-service:latest \${ECR_REPO}/order-service:latest && docker push \${ECR_REPO}/order-service:latest"
           }
         }
       }
@@ -49,16 +46,25 @@ pipeline {
       steps {
         script {
           withAWS(credentials: 'aws-credentials') {
+            // Update kubeconfig for EKS (as per project guide)
             sh "aws eks update-kubeconfig --region \${AWS_REGION} --name \${CLUSTER_NAME}"
+            
+            // Apply Kubernetes manifests (assumes k8s/app-deployment.yml exists in repo, per guide)
             sh 'kubectl apply -f k8s/app-deployment.yml'
+            
+            // Optional: Verify deployment
+            sh 'kubectl get pods'
           }
         }
       }
     }
   }
   post {
+    success {
+      echo 'Deployment successful! Check Kubernetes and monitoring dashboards.'
+    }
     failure {
-      echo 'Pipeline failed. Check logs for details.'
+      echo 'Pipeline failed. Check logs, ensure AWS CLI is installed, and verify Terraform infrastructure.'
     }
   }
 }
