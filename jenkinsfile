@@ -7,18 +7,7 @@ pipeline {
   }
   stages {
     
-    stage('Verify AWS Credentials') {  // Test credentials before using them
-      steps {
-        script {
-          withAWS(credentials: 'aws-credentials') {
-            sh '''
-              export PATH="/tmp/aws-cli/bin:$PATH"
-              aws sts get-caller-identity  # Safe test: Returns account ID if credentials are valid
-            '''
-          }
-        }
-      }
-    }
+    
     stage('Checkout') {
       steps {
         git 'https://github.com/Hibalem/ecommerce.git'
@@ -38,7 +27,6 @@ pipeline {
         script {
           withAWS(credentials: 'aws-credentials') {
             sh '''
-              export PATH="/tmp/aws-cli/bin:$PATH"  # Ensure PATH for aws
               docker tag user-service:latest ${ECR_REPO}/user-service:latest
               docker tag product-service:latest ${ECR_REPO}/product-service:latest
               docker tag order-service:latest ${ECR_REPO}/order-service:latest
@@ -56,7 +44,6 @@ pipeline {
         script {
           withAWS(credentials: 'aws-credentials') {
             sh '''
-              export PATH="/tmp/aws-cli/bin:$PATH"  # Ensure PATH for aws
               aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME}
               kubectl apply -f k8s/app-deployment.yml
             '''
