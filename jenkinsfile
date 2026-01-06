@@ -48,7 +48,7 @@ pipeline {
         script {
           withAWS(credentials: 'aws-credentials') {
             sh '''
-              //export PATH="/tmp/aws-cli/bin:$PATH"  # Ensure PATH for aws
+              export PATH="/tmp/aws-cli/bin:$PATH"  # Ensure PATH for aws
               docker tag user-service:latest ${ECR_REPO}/user-service:latest
               docker tag product-service:latest ${ECR_REPO}/product-service:latest
               docker tag order-service:latest ${ECR_REPO}/order-service:latest
