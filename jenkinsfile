@@ -6,6 +6,29 @@ pipeline {
     ECR_REPO = "891377219096.dkr.ecr.us-east-1.amazonaws.com"
   }
   stages {
+    stage('Install AWS CLI') {  // Re-added: Install AWS CLI if missing
+      steps {
+        script {
+          sh '''
+            if ! command -v aws &> /dev/null; then
+              echo "Installing AWS CLI v2..."
+              INSTALL_DIR="/home/jenkins/.aws-cli"  # User-writable directory (adjust if needed)
+              mkdir -p "$INSTALL_DIR"
+              cd /tmp
+              curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+              unzip -q awscliv2.zip
+              ./aws/install --install-dir "$INSTALL_DIR" --bin-dir "$INSTALL_DIR/bin"
+              rm -rf awscliv2.zip aws
+              export PATH="$INSTALL_DIR/bin:$PATH"
+              echo "export PATH=\"$INSTALL_DIR/bin:\$PATH\"" >> ~/.bashrc  # Optional persistence
+            else
+              echo "AWS CLI already installed."
+            fi
+            aws --version
+          '''
+        }
+      }
+    }
     stage('Checkout') {
       steps {
         git 'https://github.com/Hibalem/ecommerce.git'
@@ -24,13 +47,15 @@ pipeline {
       steps {
         script {
           withAWS(credentials: 'aws-credentials') {
-            
+            // Tag images first
             sh "docker tag user-service:latest \${ECR_REPO}/user-service:latest"
             sh "docker tag product-service:latest \${ECR_REPO}/product-service:latest"
-             sh "docker tag order-service:latest \${ECR_REPO}/order-service:latest"
-
-            sh "aws ecr get-login-password | docker login --username AWS --password-stdin 891277219096.dkr.ecr.us-east-1.amazonaws.com"
-
+            sh "docker tag order-service:latest \${ECR_REPO}/order-service:latest"
+            
+            // Login using password-stdin (works in non-interactive Jenkins shells)
+            sh "aws ecr get-login-password --region \${AWS_REGION} | docker login --username AWS --password-stdin \${ECR_REPO}"
+            
+            // Push images
             sh "docker push \${ECR_REPO}/user-service:latest"
             sh "docker push \${ECR_REPO}/product-service:latest"
             sh "docker push \${ECR_REPO}/order-service:latest"
