@@ -6,7 +6,46 @@ pipeline {
     ECR_REPO = "891377219096.dkr.ecr.us-east-1.amazonaws.com"
   }
   stages {
-    
+    stage('Install AWS CLI') {
+      steps {
+        script {
+          sh '''
+            if ! command -v aws &> /dev/null; then
+              echo "Installing AWS CLI v2..."
+              INSTALL_DIR="/tmp/aws-cli"  # Writable temp directory
+              mkdir -p "$INSTALL_DIR"
+              cd /tmp
+              rm -rf aws  # Clean up any existing aws directory to avoid unzip prompts
+              curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+              unzip -o -q awscliv2.zip  # -o overwrites without prompting, -q for quiet
+              ./aws/install --install-dir "$INSTALL_DIR" --bin-dir "$INSTALL_DIR/bin"
+              rm -rf awscliv2.zip aws
+            else
+              echo "AWS CLI already installed."
+            fi
+            export PATH="$INSTALL_DIR/bin:$PATH"  # Set PATH for this shell
+            aws --version
+          '''
+        }
+      }
+    }
+    stage('Verify AWS Credentials') {  // Test credentials before using them
+      steps {
+        script {
+          withAWS(credentials: 'aws-credentials') {
+            sh '''
+              export PATH="/tmp/aws-cli/bin:$PATH"
+              aws sts get-caller-identity  # Safe test: Returns account ID if credentials are valid
+            '''
+          }
+        }
+      }
+    }
+    stage('Checkout') {
+      steps {
+        git 'https://github.com/Hibalem/ecommerce.git'
+      }
+    }
     stage('Build Docker Images') {
       steps {
         script {
