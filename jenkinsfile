@@ -24,11 +24,11 @@ pipeline {
       steps {
         script {
           withAWS(credentials: 'aws-credentials') {
-            // Fixed login command to avoid TTY issues
-            sh "docker login --username AWS --password \$(aws ecr get-login-password --region \${AWS_REGION}) \${ECR_REPO}"
+            
             
             // Tag and push user-service
             sh "docker tag user-service:latest \${ECR_REPO}/user-service:latest"
+            sh "aws ecr get-login-password | docker login --username AWS --password-stdin 891277219096.dkr.ecr.us-east-1.amazonaws.com"
             sh "docker push \${ECR_REPO}/user-service:latest"
             
             // Tag and push product-service
