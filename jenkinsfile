@@ -6,6 +6,26 @@ pipeline {
     ECR_REPO = "891377219096.dkr.ecr.us-east-1.amazonaws.com"
   }
   stages {
+    stage('Install AWS CLI') {  // NEW STAGE: Install if missing
+      steps {
+        script {
+          sh '''
+            if ! command -v aws &> /dev/null; then
+              echo "Installing AWS CLI v2..."
+              cd /tmp
+              curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+              unzip -q awscliv2.zip
+              sudo ./aws/install || ./aws/install  # Try sudo if available, fallback without
+              rm -rf awscliv2.zip aws
+              export PATH=$PATH:/usr/local/bin  # Ensure PATH includes install location
+            else
+              echo "AWS CLI already installed."
+            fi
+            aws --version  # Verify installation
+          '''
+        }
+      }
+    }
     stage('Checkout') {
       steps {
         git 'https://github.com/Hibalem/ecommerce.git'
@@ -25,13 +45,13 @@ pipeline {
       steps {
         script {
           withAWS(credentials: 'aws-credentials') {
-            // Check if AWS CLI is available (add this for debugging)
+            // Check if AWS CLI is available (now redundant, but keep for logging)
             sh 'which aws || echo "AWS CLI not found"'
             
-            // Fixed login: Use multi-line sh to capture password securely
+            // Fixed login: Use $$ for proper escaping in multi-line sh
             sh """
-              PASSWORD=\$(aws ecr get-login-password --region \${AWS_REGION})
-              docker login --username AWS --password \$PASSWORD \${ECR_REPO}
+              PASSWORD=\$\$(aws ecr get-login-password --region \${AWS_REGION})
+              echo \$PASSWORD | docker login --username AWS --password-stdin \${ECR_REPO}
             """
             
             // Tag and push each service (expands on project guide's Docker push)
