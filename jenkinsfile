@@ -6,26 +6,29 @@ pipeline {
     ECR_REPO = "891377219096.dkr.ecr.us-east-1.amazonaws.com"
   }
   stages {
-    stage('Install AWS CLI') {  // NEW STAGE: Install if missing
-      steps {
-        script {
-          sh '''
-            if ! command -v aws &> /dev/null; then
-              echo "Installing AWS CLI v2..."
-              cd /tmp
-              curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-              unzip -q awscliv2.zip
-              sudo ./aws/install || ./aws/install  # Try sudo if available, fallback without
-              rm -rf awscliv2.zip aws
-              export PATH=$PATH:/usr/local/bin  # Ensure PATH includes install location
-            else
-              echo "AWS CLI already installed."
-            fi
-            aws --version  # Verify installation
-          '''
-        }
-      }
+    stage('Install AWS CLI') {
+  steps {
+    script {
+      sh '''
+        if ! command -v aws &> /dev/null; then
+          echo "Installing AWS CLI v2..."
+          INSTALL_DIR="/home/jenkins/.aws-cli"  # User-writable directory
+          mkdir -p "$INSTALL_DIR"  # Create if it doesn't exist
+          cd /tmp
+          curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip -q awscliv2.zip
+          ./aws/install --install-dir "$INSTALL_DIR" --bin-dir "$INSTALL_DIR/bin"  # Install to custom dir
+          rm -rf awscliv2.zip aws
+          export PATH="$INSTALL_DIR/bin:$PATH"  # Add to PATH for this session
+          echo "export PATH=\"$INSTALL_DIR/bin:\$PATH\"" >> ~/.bashrc  # Persist for future shells (optional)
+        else
+          echo "AWS CLI already installed."
+        fi
+        aws --version  # Verify installation
+      '''
     }
+  }
+}
     stage('Checkout') {
       steps {
         git 'https://github.com/Hibalem/ecommerce.git'
